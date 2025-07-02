@@ -25,7 +25,7 @@
    :jvm-opts ["-XX:-OmitStackTraceInFastThrow"]
    :extra-deps
    {org.clojure/tools.namespace {:mvn/version "1.5.0"}
-    io.github.nubank/morse {:git/tag "v2023.04.30.01", :git/sha "d99b09c"}}}
+    io.github.nubank/morse {:git/tag "v2023.10.06.02", :git/sha "88b5ff7"}}}
 
   :test
   {:main-opts ["-m" "kaocha.runner"]
