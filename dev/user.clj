@@ -24,4 +24,6 @@
 
 (comment
   (morse/launch-in-proc)
+  (stop)
+
   )
