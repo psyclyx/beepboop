@@ -3,11 +3,12 @@
     [aero.core :as aero]
     [clojure.java.io :as io]
     [donut.system :as donut]
+    [donut.system.validation :refer [validation-plugin]]
     [psyclyx.pastry :as pastry]))
 
 
 (def system
-  {::donut/plugins [pastry/pastry-plugin]
+  {::donut/plugins [pastry/pastry-plugin validation-plugin]
    ::donut/defs {:env {} ; to be replaced by config
                  }})
 
