@@ -1,6 +1,5 @@
 (ns beepboop.server
   (:require
-    [byte-streams :as bs]
     [clojure.string :as str]
     [clojure.tools.logging :as log]
     [donut.system :as donut]
