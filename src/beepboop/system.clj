@@ -1,6 +1,7 @@
 (ns beepboop.system
   (:require
     [aero.core :as aero]
+    [beepboop.server :as server]
     [clojure.java.io :as io]
     [donut.system :as donut]
     [donut.system.validation :refer [validation-plugin]]
@@ -10,7 +11,9 @@
 (def system
   {::donut/plugins [pastry/pastry-plugin validation-plugin]
    ::donut/defs {:env {} ; to be replaced by config
-                 }})
+                 :app {:server {::pastry/type ::server/tcp
+                                ::donut/config {:handler server/send-response
+                                                :bind {:port 9090}}}}}})
 
 
 (defn -read-config
