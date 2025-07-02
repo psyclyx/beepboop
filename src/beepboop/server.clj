@@ -90,13 +90,36 @@
   (.clear (.selectedKeys selector)))
 
 
+(defn shutdown-server
+  [server-channel selector]
+  ;; Close all registered channels first
+  (doseq [key (.keys selector)]
+    (let [channel (.channel key)]
+      ;; Don't close server channel twice
+      (when (not= channel server-channel)
+        (try
+          (.close channel)
+          (catch Exception _ nil)))))
+  ;; Close server channel
+  (.close server-channel)
+  ;; Close selector last
+  (.close selector))
+
+
+(defn select-and-process
+  [selector handler]
+  (when (pos? (.select selector 1000))
+    (process-selector-keys selector handler)))
+
+
 (defn server-loop
-  [selector handler shutdown]
+  [server-channel selector handler shutdown]
   (loop []
-    (when (and (not @shutdown)
-               (pos? (.select selector)))
-      (process-selector-keys selector handler))
-    (recur)))
+    (if (not @shutdown)
+      (do
+        (select-and-process selector handler)
+        (recur))
+      (shutdown-server server-channel selector))))
 
 
 (defn start-server
@@ -104,14 +127,15 @@
   (let [server-channel (create-server-channel bind)
         selector (create-selector-with-server server-channel)
         shutdown (atom false)
-        server (future (server-loop selector handler shutdown))]
+        server (future (server-loop server-channel selector handler shutdown))]
     {:shutdown shutdown
      :server server}))
 
 
 (defn stop-server
-  [{{:keys [shutdown]} ::donut/instance}]
-  (reset! shutdown true))
+  [{{:keys [server shutdown]} ::donut/instance}]
+  (reset! shutdown true)
+  @server)
 
 
 (defmethod pastry/->component ::tcp
