@@ -4,6 +4,7 @@
     [beepboop.draw :as draw]
     [beepboop.server :as server]
     [beepboop.telnet :as telnet]
+    [beepboop.text-edit :as text-edit]
     [clojure.string :as str]
     [clojure.tools.logging :as log]))
 
@@ -30,7 +31,12 @@
                                       (ansi/bytes-to-chars-filter
                                         (ansi/escape-codes-filter
                                           #(handle-event @connection %))))
-                        :canvas (draw/make-canvas)})
+                        :canvas (draw/make-canvas)
+                        :edit-view (text-edit/text-edit-view
+                                     "Edit box"
+                                     [6 4]
+                                     30
+                                     #(log/info "Text entered" %))})
     @connection))
 
 
@@ -40,20 +46,12 @@
 
 
 (defn handle-event
-  [{:keys [canvas] :as connection} {:keys [type] :as event}]
+  [{:keys [canvas edit-view] :as connection} {:keys [type] :as event}]
+  ;; (log/info "Event" event)
   (case type
-    :input (log/info "Got char" (get event :char))
-    :screen-size (do (draw/set-size canvas (get event :size))
-                     (render connection))
-    :arrow (let [[x y] (draw/get-cursor-position canvas)]
-             (draw/set-cursor-position canvas
-                                       (case (get event :direction)
-                                         :left   [(- x 1) y]
-                                         :right  [(+ x 1) y]
-                                         :up     [x (- y 1)]
-                                         :down   [x (+ y 1)]))
-             (render connection))
-    (log/info "Unhandled event" type)))
+    :screen-size (draw/set-size canvas (get event :size))
+    ((get edit-view :handle-event) edit-view event))
+  (render connection))
 
 
 (defn handle-packet
@@ -64,7 +62,6 @@
 
 (defn send-frame
   [{:keys [channel canvas] :as _connection}]
-  (log/info "Sending frame")
   (let [[cursor-x cursor-y] (draw/get-cursor-position canvas)]
     ;; TODO: save previous canvas and only send diff
     (server/send-message channel (str ansi-clear
@@ -74,10 +71,8 @@
 
 
 (defn render
-  [{:keys [canvas] :as connection}]
+  [{:keys [canvas edit-view] :as connection}]
   (let [[width height] (draw/get-size canvas)]
     (draw/box canvas [0 0] [width height])
-    (draw/box canvas [5 3] [(quot width 2) 3])
-    (draw/rect canvas "█" [7 4] [(- (quot width 2) 4) 1])
-    (draw/shape canvas [6 3] [" Welcome "]))
-  (send-frame connection))
+    ((get edit-view :render) edit-view canvas)
+    (send-frame connection)))

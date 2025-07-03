@@ -4,10 +4,10 @@
 (defn parse-code
   [code]
   (cond
-    (= code "A") {:type :arrow :direction :up}
-    (= code "B") {:type :arrow :direction :down}
-    (= code "C") {:type :arrow :direction :right}
-    (= code "D") {:type :arrow :direction :left}
+    (= code "A") {:type :press :key :arrow-up}
+    (= code "B") {:type :press :key :arrow-down}
+    (= code "C") {:type :press :key :arrow-right}
+    (= code "D") {:type :press :key :arrow-left}
     :else nil))
 
 
@@ -30,6 +30,12 @@
               () ; Incomplete escape sequence
               (do (if-let [match (re-matches #"\x1b\[([0-?]*[ -/]*[@-~])" @buffer)]
                     (some-> (parse-code (get match 1)) sink)
-                    (doseq [c @buffer] (sink {:type :input :char c})))
+                    (doseq [c @buffer] (cond
+                                         (= (int c) 0) () ; Seems to happen after every enter??
+                                         (= (int c) 127) (sink {:type :press :key :backspace})
+                                         (= (int c) 9) (sink {:type :press :key :tab})
+                                         (= (int c) 13) (sink {:type :press :key :enter})
+                                         (= (int c) 10) (sink {:type :press :key :newline})
+                                         :else (sink {:type :input :char c}))))
                   (reset! buffer ""))))
         (sink event)))))
