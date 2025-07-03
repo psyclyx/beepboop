@@ -5,8 +5,19 @@
     [clojure.tools.logging :as log]))
 
 
+(declare handle-packet)
+
+
+(defn handle-connect
+  [channel]
+  (log/info "New connection")
+  (server/send-response channel "Connected!\n")
+  {:channel channel
+   :handle-packet handle-packet})
+
+
 (defn handle-packet
-  [client-channel data]
+  [{:keys [channel] :as _client} data]
   (let [trimmed (str/trim data)]
-    (println "got packet:" trimmed)
-    (server/send-response client-channel (str ">" trimmed "<"))))
+    (log/info "Got packet:" trimmed)
+    (server/send-response channel (str ">" trimmed "<"))))

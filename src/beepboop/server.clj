@@ -54,12 +54,12 @@
 
 
 (defn accept-client
-  [{:keys [selector handler] :as _context} server-channel]
+  [{:keys [selector connection-handler connections] :as _context} server-channel]
   (when-let [client-channel (.accept server-channel)]
     (doto client-channel
       (.configureBlocking false)
       (.register selector SelectionKey/OP_READ))
-    (handler client-channel "")))
+    (swap! connections assoc client-channel (connection-handler client-channel))))
 
 
 (defn read-from-client
@@ -71,10 +71,11 @@
 
 
 (defn handle-client-read
-  [{:keys [handler] :as _context} key]
+  [{:keys [connections] :as _context} key]
   (let [client-channel (.channel key)]
     (if-let [s (read-from-client client-channel)]
-      (handler client-channel s)
+      (let [connection (get @connections client-channel)]
+        ((get connection :handle-packet) connection s))
       (.close client-channel))))
 
 
@@ -123,11 +124,11 @@
 
 
 (defn start-server
-  [{{:keys [bind handler]} ::donut/config}]
+  [{{:keys [bind connection-handler]} ::donut/config}]
   (let [server-channel (create-server-channel bind)
         shutdown (atom false)
         context {:server-channel server-channel
-                 :handler handler
+                 :connection-handler connection-handler
                  :connections (atom {})
                  :selector (create-selector-with-server server-channel)
                  :shutdown shutdown}
@@ -146,7 +147,7 @@
   [m]
   (assoc m
          ::donut/config-schema [:map
-                                [:handler 'fn?]
+                                [:connection-handler 'fn?]
                                 [:bind Bind]]
          ::donut/start start-server
          ::donut/stop stop-server))

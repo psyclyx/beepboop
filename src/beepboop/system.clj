@@ -13,7 +13,7 @@
   {::donut/plugins [pastry/pastry-plugin validation-plugin]
    ::donut/defs {:env {} ; to be replaced by config
                  :app {:server {::pastry/type ::server/tcp
-                                ::donut/config {:handler connection/handle-packet
+                                ::donut/config {:connection-handler connection/handle-connect
                                                 :bind {:port 9090}}}}}})
 
 
