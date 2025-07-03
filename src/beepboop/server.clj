@@ -31,12 +31,14 @@
     (InetSocketAddress. port)))
 
 
-(defn send-response
-  [client-channel response]
-  (some->> response
-           .getBytes
-           ByteBuffer/wrap
-           (.write client-channel)))
+(defn send-message
+  [client-channel message]
+  (let [message-bytes (if (string? message)
+                        (.getBytes message)
+                        (byte-array message))]
+    (->> message-bytes
+         ByteBuffer/wrap
+         (.write client-channel))))
 
 
 (defn create-server-channel
