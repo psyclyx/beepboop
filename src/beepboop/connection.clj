@@ -27,6 +27,22 @@
 (def ansi-reset-cursor  "\033[H")
 
 
+(defn get-16-bit-int-from-bytes
+  [bytes index]
+  (bit-or (bit-shift-left (bit-and (aget bytes index) 0xFF) 8)
+          (bit-and (aget bytes (+ index 1)) 0xFF)))
+
+
+(defn parse-telnet-sb
+  [type bytes]
+  (case type
+    :sb-naws {:type :screen-size
+              :width (get-16-bit-int-from-bytes bytes 0)
+              :height (get-16-bit-int-from-bytes bytes 2)}
+    (do (log/info "Telnet SB" type)
+        nil)))
+
+
 ;; See https://github.com/seanmiddleditch/libtelnet/blob/5f5ecee776b9bdaa4e981e5f807079a9c79d633e/libtelnet.c#L973
 (defn make-telnet-filter
   []
@@ -59,11 +75,9 @@
                    (= byte telnet-iac) (reset! state :sb-iac)
                    :else (swap! sb-buffer #(byte-array (concat % [byte]))))
         :sb-iac (cond
-                  (= byte telnet-se) (do (case @sb-type
-                                           :sb-naws (meta-cb {:type :screen-size
-                                                              :width (bit-or (bit-shift-left (bit-and (aget @sb-buffer 0) 0xFF) 8) (bit-and (aget @sb-buffer 1) 0xFF))
-                                                              :height (bit-or (bit-shift-left (bit-and (aget @sb-buffer 2) 0xFF) 8) (bit-and (aget @sb-buffer 3) 0xFF))})
-                                           (log/info "Telnet SB" @sb-type))
+                  (= byte telnet-se) (do (some-> (parse-telnet-sb @sb-type @sb-buffer) meta-cb)
+                                         (reset! sb-type nil)
+                                         (reset! sb-buffer nil)
                                          (reset! state :data))
                   :else (do (swap! sb-buffer #(byte-array (concat % [byte])))
                             (reset! state :sb-data)))))))
