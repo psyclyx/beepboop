@@ -34,43 +34,45 @@
 
 
 ;; See https://github.com/seanmiddleditch/libtelnet/blob/5f5ecee776b9bdaa4e981e5f807079a9c79d633e/libtelnet.c#L973
-(defn make-parser
-  []
+(defn command-filter
+  [sink]
   (let [state (atom :data)
         sb-type (atom nil)
         sb-buffer (atom nil)]
-    (fn [byte event-cb passthrough-cb]
-      (case @state
-        :data (cond
-                (= byte telnet-iac) (reset! state :iac)
-                :else (passthrough-cb byte))
-        :iac (cond
-               (= byte telnet-iac) (do (passthrough-cb telnet-iac) ; escaped IAC
-                                       (reset! state :data))
-               (= byte telnet-sb) (reset! state :sb)
-               (= byte telnet-do) (reset! state :do)
-               (= byte telnet-dont) (reset! state :dont)
-               (= byte telnet-will) (reset! state :will)
-               (= byte telnet-wont) (reset! state :wont)
-               :else (do (log/info "Telnet command " byte)
-                         (reset! state :data)))
-        (:do :dont :will :wont) (do (log/info "Telnet command" @state byte)
-                                    (reset! state :data))
-        :sb (do (cond
-                  (= byte telnet-naws) (reset! sb-type :sb-naws)
-                  :else (reset! sb-type byte))
-                (reset! sb-buffer (byte-array []))
-                (reset! state :sb-data))
-        :sb-data (cond
-                   (= byte telnet-iac) (reset! state :sb-iac)
-                   :else (swap! sb-buffer #(byte-array (concat % [byte]))))
-        :sb-iac (cond
-                  (= byte telnet-se) (do (some-> (parse-sb @sb-type @sb-buffer) event-cb)
-                                         (reset! sb-type nil)
-                                         (reset! sb-buffer nil)
+    (fn [{:keys [type byte] :as event}]
+      (if (= type :input-byte)
+        (case @state
+          :data (cond
+                  (= byte telnet-iac) (reset! state :iac)
+                  :else (sink event))
+          :iac (cond
+                 (= byte telnet-iac) (do (sink event) ; escaped IAC
                                          (reset! state :data))
-                  :else (do (swap! sb-buffer #(byte-array (concat % [byte])))
-                            (reset! state :sb-data)))))))
+                 (= byte telnet-sb) (reset! state :sb)
+                 (= byte telnet-do) (reset! state :do)
+                 (= byte telnet-dont) (reset! state :dont)
+                 (= byte telnet-will) (reset! state :will)
+                 (= byte telnet-wont) (reset! state :wont)
+                 :else (do (log/info "Telnet command " byte)
+                           (reset! state :data)))
+          (:do :dont :will :wont) (do (log/info "Telnet command" @state byte)
+                                      (reset! state :data))
+          :sb (do (cond
+                    (= byte telnet-naws) (reset! sb-type :sb-naws)
+                    :else (reset! sb-type byte))
+                  (reset! sb-buffer (byte-array []))
+                  (reset! state :sb-data))
+          :sb-data (cond
+                     (= byte telnet-iac) (reset! state :sb-iac)
+                     :else (swap! sb-buffer #(byte-array (concat % [byte]))))
+          :sb-iac (cond
+                    (= byte telnet-se) (do (some-> (parse-sb @sb-type @sb-buffer) sink)
+                                           (reset! sb-type nil)
+                                           (reset! sb-buffer nil)
+                                           (reset! state :data))
+                    :else (do (swap! sb-buffer #(byte-array (concat % [byte])))
+                              (reset! state :sb-data))))
+        (sink event)))))
 
 
 (defn initialize

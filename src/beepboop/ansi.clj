@@ -1,6 +1,4 @@
-(ns beepboop.ansi
-  (:require
-    [clojure.tools.logging :as log]))
+(ns beepboop.ansi)
 
 
 (defn parse-code
@@ -13,14 +11,24 @@
     :else nil))
 
 
-(defn make-parser
-  []
+(defn bytes-to-chars-filter
+  [sink]
+  (fn [{:keys [type byte] :as event}]
+    (if (= type :input-byte)
+      (sink {:type :input :char (char byte)})
+      (sink event))))
+
+
+(defn escape-codes-filter
+  [sink]
   (let [buffer (atom "")]
-    (fn [c event-cb passthrough-cb]
-      (swap! buffer #(str % c))
-      (if (re-matches #"\x1b($|\[[^@-~]*)" @buffer)
-        () ; Incomplete escape sequence
-        (do (if-let [match (re-matches #"\x1b\[([0-?]*[ -/]*[@-~])" @buffer)]
-              (some-> (parse-code (get match 1)) event-cb)
-              (doseq [c @buffer] (passthrough-cb c)))
-            (reset! buffer ""))))))
+    (fn [{:keys [type char] :as event}]
+      (if (= type :input)
+        (do (swap! buffer #(str % char))
+            (if (re-matches #"\x1b($|\[[^@-~]*)" @buffer)
+              () ; Incomplete escape sequence
+              (do (if-let [match (re-matches #"\x1b\[([0-?]*[ -/]*[@-~])" @buffer)]
+                    (some-> (parse-code (get match 1)) sink)
+                    (doseq [c @buffer] (sink {:type :input :char c})))
+                  (reset! buffer ""))))
+        (sink event)))))

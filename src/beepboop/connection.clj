@@ -10,6 +10,7 @@
 
 (declare handle-packet)
 (declare handle-disconnect)
+(declare handle-event)
 (declare render)
 
 
@@ -21,12 +22,16 @@
   [channel]
   (log/info "New connection")
   (telnet/initialize channel)
-  {:channel channel
-   :handle-packet handle-packet
-   :handle-disconnect handle-disconnect
-   :parse-telnet (telnet/make-parser)
-   :parse-ansi (ansi/make-parser)
-   :canvas (draw/make-canvas)})
+  (let [connection (atom nil)]
+    (reset! connection {:channel channel
+                        :handle-packet handle-packet
+                        :handle-disconnect handle-disconnect
+                        :event-sink (telnet/command-filter
+                                      (ansi/bytes-to-chars-filter
+                                        (ansi/escape-codes-filter
+                                          #(handle-event @connection %))))
+                        :canvas (draw/make-canvas)})
+    @connection))
 
 
 (defn handle-disconnect
@@ -37,7 +42,7 @@
 (defn handle-event
   [{:keys [canvas] :as connection} {:keys [type] :as event}]
   (case type
-    :input (log/info "Got byte" (get event :char))
+    :input (log/info "Got char" (get event :char))
     :screen-size (do (draw/set-size canvas (get event :size))
                      (render connection))
     :arrow (let [[x y] (draw/get-cursor-position canvas)]
@@ -52,12 +57,9 @@
 
 
 (defn handle-packet
-  [{:keys [parse-telnet parse-ansi] :as connection} input-bytes]
-  (let [recv-event (fn [event] (handle-event connection event))
-        recv-input (fn [input-char] {:type :input :char input-char})
-        recv-ansi (fn [input-byte] (parse-ansi (char input-byte) recv-event recv-input))]
-    (doseq [byte input-bytes]
-      (parse-telnet byte recv-event recv-ansi))))
+  [{:keys [:event-sink] :as _connection} input-bytes]
+  (doseq [byte input-bytes]
+    (event-sink {:type :input-byte :byte byte})))
 
 
 (defn send-frame
