@@ -5,6 +5,7 @@
     [clojure.tools.logging :as log]))
 
 
+(def ms-between-ticks 50)
 (def drag 0.1)
 (def grav 2)
 (def map-width 500)
@@ -17,11 +18,18 @@
                (repeat (quot map-height 2) (vec (repeat map-width {:type :ground}))))))
 
 
+(defn get-current-ms
+  []
+  (quot (System/nanoTime) 1000000))
+
+
 (defn make-game
   []
   {:objects (atom [])
    :grid (atom (make-grid))
-   :offset (map quot [map-width map-height] [2 2])})
+   :offset (map quot [map-width map-height] [2 2])
+   :next-tick-target (atom (get-current-ms))
+   :listeners (atom (set []))})
 
 
 (defn create-object
@@ -32,6 +40,16 @@
                    :moving true})]
     (swap! objects #(conj % obj))
     obj))
+
+
+(defn register-listener
+  [{:keys [listeners] :as _game} listener]
+  (swap! listeners #(conj % listener)))
+
+
+(defn unregister-listener
+  [{:keys [listeners] :as _game} listener]
+  (swap! listeners #(disj % listener)))
 
 
 (defn get-tile
@@ -50,7 +68,7 @@
 
 
 (defn tick
-  [{:keys [grid offset objects] :as _game} dt]
+  [{:keys [grid offset objects listeners] :as _game} dt]
   (doseq [obj @objects]
     (swap! obj (fn [{:keys [pos vel moving] :as obj}]
                  (if moving
@@ -58,7 +76,24 @@
                          vel (map - (apply-grav (apply-drag vel dt) dt))
                          moving (not (get-tile @grid offset pos))]
                      (assoc obj :pos pos :vel vel :moving moving))
-                   obj)))))
+                   obj))))
+  (doseq [{:keys [after-tick]} @listeners]
+    (after-tick)))
+
+
+(defn maybe-tick
+  [{:keys [next-tick-target] :as game}]
+  (let [current (get-current-ms)
+        time-til-tick (- @next-tick-target current)]
+    (if (< time-til-tick 2)
+      (do (reset! next-tick-target (+ @next-tick-target ms-between-ticks))
+          (tick game (/ ms-between-ticks 1000))
+          (let [current (get-current-ms)]
+            (when (< @next-tick-target current)
+              (log/info "Fell behind our clock, drifting to resync"))
+            (reset! next-tick-target (+ current ms-between-ticks))
+            (- @next-tick-target current)))
+      (- @next-tick-target current))))
 
 
 (defn render

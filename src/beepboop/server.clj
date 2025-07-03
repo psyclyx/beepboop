@@ -1,5 +1,6 @@
 (ns beepboop.server
   (:require
+    [beepboop.game :as game]
     [clojure.string :as str]
     [clojure.tools.logging :as log]
     [donut.system :as donut]
@@ -111,9 +112,10 @@
 
 
 (defn select-and-process
-  [{:keys [selector] :as context}]
-  (when (pos? (.select selector 1000))
-    (process-selector-keys context)))
+  [{:keys [selector game] :as context}]
+  (let [timeout (game/maybe-tick game)]
+    (when (pos? (.select selector timeout))
+      (process-selector-keys context))))
 
 
 (defn server-loop

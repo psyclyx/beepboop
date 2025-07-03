@@ -35,16 +35,19 @@
                                           #(handle-event @connection %))))
                         :canvas (draw/make-canvas)
                         :game game
+                        :after-tick #(render @connection)
                         :character (game/create-object game [(- (rand-int 50) 25) -5] [0 0] "@")
                         :edit-view (text-edit/text-edit-view
                                      "Command"
                                      [5 3] 50
                                      #(handle-command @connection %))})
+    (game/register-listener game @connection)
     @connection))
 
 
 (defn handle-disconnect
-  [_connection]
+  [{:keys [game] :as connection}]
+  (game/unregister-listener game connection)
   (log/info "Connection closed"))
 
 
