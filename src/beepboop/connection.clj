@@ -90,7 +90,7 @@
 (defn draw-all
   [{:keys [screen-size] :as connection}]
   (let [[width height] @screen-size]
-    (send-frame connection (concat [(str "." (apply str (repeat (- width 2) "-")) ".")]
+    (send-frame connection (concat [(str "╭" (apply str (repeat (- width 2) "─")) "╮")]
                                    (repeat (- height 2)
-                                           (str "|" (apply str (repeat (- width 2) " ")) "|"))
-                                   [(str "'" (apply str (repeat (- width 2) "-")) "'")]))))
+                                           (str "│" (apply str (repeat (- width 2) " ")) "│"))
+                                   [(str "╰" (apply str (repeat (- width 2) "─")) "╯")]))))
