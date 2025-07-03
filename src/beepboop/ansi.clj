@@ -16,11 +16,11 @@
 (defn make-parser
   []
   (let [buffer (atom "")]
-    (fn [c meta-cb data-cb]
+    (fn [c event-cb passthrough-cb]
       (swap! buffer #(str % c))
       (if (re-matches #"\x1b($|\[[^@-~]*)" @buffer)
         () ; Incomplete escape sequence
         (do (if-let [match (re-matches #"\x1b\[([0-?]*[ -/]*[@-~])" @buffer)]
-              (some-> (parse-code (get match 1)) meta-cb)
-              (doseq [c @buffer] (data-cb c)))
+              (some-> (parse-code (get match 1)) event-cb)
+              (doseq [c @buffer] (passthrough-cb c)))
             (reset! buffer ""))))))

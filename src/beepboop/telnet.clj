@@ -39,13 +39,13 @@
   (let [state (atom :data)
         sb-type (atom nil)
         sb-buffer (atom nil)]
-    (fn [byte meta-cb data-cb]
+    (fn [byte event-cb passthrough-cb]
       (case @state
         :data (cond
                 (= byte telnet-iac) (reset! state :iac)
-                :else (data-cb byte))
+                :else (passthrough-cb byte))
         :iac (cond
-               (= byte telnet-iac) (do (data-cb telnet-iac) ; escaped IAC
+               (= byte telnet-iac) (do (passthrough-cb telnet-iac) ; escaped IAC
                                        (reset! state :data))
                (= byte telnet-sb) (reset! state :sb)
                (= byte telnet-do) (reset! state :do)
@@ -65,7 +65,7 @@
                    (= byte telnet-iac) (reset! state :sb-iac)
                    :else (swap! sb-buffer #(byte-array (concat % [byte]))))
         :sb-iac (cond
-                  (= byte telnet-se) (do (some-> (parse-sb @sb-type @sb-buffer) meta-cb)
+                  (= byte telnet-se) (do (some-> (parse-sb @sb-type @sb-buffer) event-cb)
                                          (reset! sb-type nil)
                                          (reset! sb-buffer nil)
                                          (reset! state :data))

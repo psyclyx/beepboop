@@ -34,36 +34,30 @@
   (log/info "Connection closed"))
 
 
-(defn handle-meta
-  [{:keys [canvas] :as connection} {:keys [type] :as meta}]
+(defn handle-event
+  [{:keys [canvas] :as connection} {:keys [type] :as event}]
   (case type
-    :screen-size (do (draw/set-size canvas (get meta :size))
+    :input (log/info "Got byte" (get event :char))
+    :screen-size (do (draw/set-size canvas (get event :size))
                      (render connection))
     :arrow (let [[x y] (draw/get-cursor-position canvas)]
              (draw/set-cursor-position canvas
-                                       (case (get meta :direction)
+                                       (case (get event :direction)
                                          :left   [(- x 1) y]
                                          :right  [(+ x 1) y]
                                          :up     [x (- y 1)]
                                          :down   [x (+ y 1)]))
              (render connection))
-    (log/info "Unhandled meta info" type)))
-
-
-(defn handle-input
-  [connection byte]
-  (cond
-    (= byte 13) (render connection))
-  (log/info "Got byte" byte))
+    (log/info "Unhandled event" type)))
 
 
 (defn handle-packet
   [{:keys [parse-telnet parse-ansi] :as connection} input-bytes]
-  (let [recv-input #(handle-input connection %)
-        recv-meta #(handle-meta connection %)
-        recv-ansi #(parse-ansi (char %) recv-meta recv-input)]
+  (let [recv-event (fn [event] (handle-event connection event))
+        recv-input (fn [input-char] {:type :input :char input-char})
+        recv-ansi (fn [input-byte] (parse-ansi (char input-byte) recv-event recv-input))]
     (doseq [byte input-bytes]
-      (parse-telnet byte recv-meta recv-ansi))))
+      (parse-telnet byte recv-event recv-ansi))))
 
 
 (defn send-frame
