@@ -57,8 +57,8 @@
   [server-channel selector]
   (when-let [client-channel (.accept server-channel)]
     (doto client-channel
-      (.configureBlocking false))
-    (.register client-channel selector SelectionKey/OP_READ)))
+      (.configureBlocking false)
+      (.register selector SelectionKey/OP_READ))))
 
 
 (defn read-from-client
