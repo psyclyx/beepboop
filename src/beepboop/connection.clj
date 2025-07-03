@@ -20,6 +20,7 @@
 (def telnet-linemode          (unchecked-byte 0x22))
 (def telnet-sb                (unchecked-byte 0xFA))
 (def telnet-se                (unchecked-byte 0xF0))
+(def telnet-naws              (unchecked-byte 0x1F))
 
 
 (def ansi-clear         "\033[2J")
@@ -29,14 +30,16 @@
 ;; See https://github.com/seanmiddleditch/libtelnet/blob/5f5ecee776b9bdaa4e981e5f807079a9c79d633e/libtelnet.c#L973
 (defn make-telnet-filter
   []
-  (let [state (atom :data)]
-    (fn [byte passthrough]
+  (let [state (atom :data)
+        sb-type (atom nil)
+        sb-buffer (atom nil)]
+    (fn [byte meta-cb data-cb]
       (case @state
         :data (cond
                 (= byte telnet-iac) (reset! state :iac)
-                :else (passthrough byte))
+                :else (data-cb byte))
         :iac (cond
-               (= byte telnet-iac) (do (passthrough telnet-iac) ; escaped IAC
+               (= byte telnet-iac) (do (data-cb telnet-iac) ; escaped IAC
                                        (reset! state :data))
                (= byte telnet-sb) (reset! state :sb)
                (= byte telnet-do) (reset! state :do)
@@ -47,12 +50,23 @@
                          (reset! state :data)))
         (:do :dont :will :wont) (do (log/info "Telnet command" @state byte)
                                     (reset! state :data))
-        :sb (cond
-              (= byte telnet-iac) (reset! state :sb-iac))
+        :sb (do (cond
+                  (= byte telnet-naws) (reset! sb-type :sb-naws)
+                  :else (reset! sb-type byte))
+                (reset! sb-buffer (byte-array []))
+                (reset! state :sb-data))
+        :sb-data (cond
+                   (= byte telnet-iac) (reset! state :sb-iac)
+                   :else (swap! sb-buffer #(byte-array (concat % [byte]))))
         :sb-iac (cond
-                  (= byte telnet-se) (do (log/info "Telnet SB")
+                  (= byte telnet-se) (do (case @sb-type
+                                           :sb-naws (meta-cb {:type :screen-size
+                                                              :width (bit-or (bit-shift-left (bit-and (aget @sb-buffer 0) 0xFF) 8) (bit-and (aget @sb-buffer 1) 0xFF))
+                                                              :height (bit-or (bit-shift-left (bit-and (aget @sb-buffer 2) 0xFF) 8) (bit-and (aget @sb-buffer 3) 0xFF))})
+                                           (log/info "Telnet SB" @sb-type))
                                          (reset! state :data))
-                  :else (reset! state :sb))))))
+                  :else (do (swap! sb-buffer #(byte-array (concat % [byte])))
+                            (reset! state :sb-data)))))))
 
 
 (defn handle-connect
@@ -61,8 +75,8 @@
   (server/send-message channel [telnet-iac telnet-will telnet-echo
                                 telnet-iac telnet-do telnet-suppress-go-ahead
                                 telnet-iac telnet-will telnet-suppress-go-ahead
-                                telnet-iac telnet-dont telnet-linemode])
-  (server/send-message channel "Connected!")
+                                telnet-iac telnet-dont telnet-linemode
+                                telnet-iac telnet-do telnet-naws])
   {:channel channel
    :handle-packet handle-packet
    :handle-disconnect handle-disconnect
@@ -76,6 +90,16 @@
   (log/info "Connection closed"))
 
 
+(defn handle-meta
+  [{:keys [screen-width screen-height] :as connection} {:keys [type] :as meta}]
+  (case type
+    :screen-size (do (reset! screen-width (get meta :width))
+                     (reset! screen-height (get meta :height))
+                     (log/info "Screen size set to" @screen-width @screen-height)
+                     (draw-all connection))
+    (log/info "Unhandled meta info" type)))
+
+
 (defn handle-input
   [connection byte]
   (cond
@@ -86,12 +110,13 @@
 (defn handle-packet
   [{:keys [filter-telnet] :as connection} input-bytes]
   (doseq [byte input-bytes]
-    (filter-telnet byte #(handle-input connection %))))
+    (filter-telnet byte #(handle-meta connection %) #(handle-input connection %))))
 
 
 (defn draw-all
   [{:keys [channel screen-width screen-height] :as _connection}]
+  (log/info "Drawing")
   (server/send-message channel (str ansi-clear ansi-reset-cursor
-                                    (str (apply str (repeat @screen-width "-")) "\n\r")
-                                    (apply str (repeat @screen-height (str "|" (apply str (repeat (- @screen-width 2) " ")) "|\n\r")))
-                                    (str (apply str (repeat @screen-width "-")) "\n\r"))))
+                                    (apply str (repeat @screen-width "-")) "\n\r"
+                                    (apply str (repeat (- @screen-height 2) (str "|" (apply str (repeat (- @screen-width 2) " ")) "|\n\r")))
+                                    (apply str (repeat @screen-width "-")))))
