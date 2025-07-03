@@ -1,8 +1,8 @@
 (ns beepboop.connection
   (:require
+    [beepboop.server :as server]
     [clojure.string :as str]
-    [clojure.tools.logging :as log]
-    [beepboop.server :as server]))
+    [clojure.tools.logging :as log]))
 
 
 (defn handle-packet

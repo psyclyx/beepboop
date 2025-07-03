@@ -1,8 +1,8 @@
 (ns user
   (:require
+    [beepboop.system :as sys]
     [dev.nu.morse :as morse]
     [donut.system :as donut]
-    [beepboop.system :as sys]
     [donut.system.repl :as donut.repl]
     [donut.system.repl.state :refer [system]]))
 

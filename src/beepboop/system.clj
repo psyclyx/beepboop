@@ -1,11 +1,11 @@
 (ns beepboop.system
   (:require
     [aero.core :as aero]
+    [beepboop.connection :as connection]
     [beepboop.server :as server]
     [clojure.java.io :as io]
     [donut.system :as donut]
     [donut.system.validation :refer [validation-plugin]]
-    [beepboop.connection :as connection]
     [psyclyx.pastry :as pastry]))
 
 
