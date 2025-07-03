@@ -22,6 +22,11 @@
   (donut.repl/stop))
 
 
+(defn refresh
+  []
+  (donut.repl/restart))
+
+
 (comment
   (morse/launch-in-proc)
   (stop)
