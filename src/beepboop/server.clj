@@ -72,11 +72,12 @@
 
 (defn handle-client-read
   [{:keys [connections] :as _context} key]
-  (let [client-channel (.channel key)]
+  (let [client-channel (.channel key)
+        {:keys [handle-packet handle-disconnect] :as connection} (get @connections client-channel)]
     (if-let [s (read-from-client client-channel)]
-      (let [connection (get @connections client-channel)]
-        ((get connection :handle-packet) connection s))
-      (.close client-channel))))
+      (handle-packet connection s)
+    (do (handle-disconnect connection)
+        (.close client-channel)))))
 
 
 (defn process-selector-keys
