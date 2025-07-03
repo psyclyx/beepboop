@@ -27,8 +27,8 @@
   [type bytes]
   (case type
     :sb-naws {:type :screen-size
-              :width (get-16-bit-int-from-bytes bytes 0)
-              :height (get-16-bit-int-from-bytes bytes 2)}
+              :size [(get-16-bit-int-from-bytes bytes 0)
+                     (get-16-bit-int-from-bytes bytes 2)]}
     (do (log/info "Telnet SB" type)
         nil)))
 
