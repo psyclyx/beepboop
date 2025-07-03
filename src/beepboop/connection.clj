@@ -7,6 +7,7 @@
 
 (declare handle-packet)
 (declare handle-disconnect)
+(declare draw-all)
 
 
 (def telnet-iac               (unchecked-byte 0xFF))
@@ -19,6 +20,10 @@
 (def telnet-linemode          (unchecked-byte 0x22))
 (def telnet-sb                (unchecked-byte 0xFA))
 (def telnet-se                (unchecked-byte 0xF0))
+
+
+(def ansi-clear         "\033[2J")
+(def ansi-reset-cursor  "\033[H")
 
 
 ;; See https://github.com/seanmiddleditch/libtelnet/blob/5f5ecee776b9bdaa4e981e5f807079a9c79d633e/libtelnet.c#L973
@@ -61,7 +66,9 @@
   {:channel channel
    :handle-packet handle-packet
    :handle-disconnect handle-disconnect
-   :filter-telnet (make-telnet-filter)})
+   :filter-telnet (make-telnet-filter)
+   :screen-width (atom 80)
+   :screen-height (atom 80)})
 
 
 (defn handle-disconnect
@@ -70,7 +77,9 @@
 
 
 (defn handle-input
-  [_connection byte]
+  [connection byte]
+  (cond
+    (= byte 13) (draw-all connection))
   (log/info "Got byte" byte))
 
 
@@ -80,4 +89,9 @@
     (filter-telnet byte #(handle-input connection %))))
 
 
-;; (server/send-message channel (str ">" trimmed "<"))))
+(defn draw-all
+  [{:keys [channel screen-width screen-height] :as _connection}]
+  (server/send-message channel (str ansi-clear ansi-reset-cursor
+                                    (str (apply str (repeat @screen-width "-")) "\n\r")
+                                    (apply str (repeat @screen-height (str "|" (apply str (repeat (- @screen-width 2) " ")) "|\n\r")))
+                                    (str (apply str (repeat @screen-width "-")) "\n\r"))))
