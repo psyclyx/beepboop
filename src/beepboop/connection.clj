@@ -34,19 +34,28 @@
   (log/info "Connection closed"))
 
 
+(defn set-cursor-position
+  [{:keys [screen-size cursor-position] :as _connection} [x y]]
+  (let [[width height] @screen-size]
+    (reset! cursor-position [(max 0 (min width x))
+                             (max 0 (min height y))])))
+
+
 (defn handle-meta
   [{:keys [screen-size cursor-position] :as connection} {:keys [type] :as meta}]
   (case type
     :screen-size (do (reset! screen-size (get meta :size))
                      (log/info "Screen size set to" @screen-size)
+                     (set-cursor-position connection @cursor-position)
                      (draw-all connection))
-    :arrow (do (swap! cursor-position (fn [[x y]]
-                                        (case (get meta :direction)
-                                          :left   [(- x 1) y]
-                                          :right  [(+ x 1) y]
-                                          :up     [x (- y 1)]
-                                          :down   [x (+ y 1)])))
-               (draw-all connection))
+    :arrow (let [[x y] @cursor-position]
+             (set-cursor-position connection
+                                  (case (get meta :direction)
+                                    :left   [(- x 1) y]
+                                    :right  [(+ x 1) y]
+                                    :up     [x (- y 1)]
+                                    :down   [x (+ y 1)]))
+             (draw-all connection))
     (log/info "Unhandled meta info" type)))
 
 
@@ -66,31 +75,22 @@
       (parse-telnet byte recv-meta recv-ansi))))
 
 
-(defn clamp
-  [value min-val max-val]
-  (max min-val (min max-val value)))
-
-
 (defn send-frame
-  [{:keys [channel cursor-position screen-size] :as _connection} canvas]
+  [{:keys [channel] :as _connection} canvas [cursor-x cursor-y]]
   (log/info "Sending frame")
-  (let [[cursor-x cursor-y] @cursor-position
-        [screen-width screen-height] @screen-size]
-    ;; TODO: save previous canvas and only send diff
-    (server/send-message channel (str ansi-clear
-                                      ansi-reset-cursor
-                                      (str/join "\n\r" canvas)
-                                      "\033["
-                                      (clamp cursor-y 0 (- screen-height 1))
-                                      ";"
-                                      (clamp cursor-x 0 (- screen-width 1))
-                                      "H"))))
+  ;; TODO: save previous canvas and only send diff
+  (server/send-message channel (str ansi-clear
+                                    ansi-reset-cursor
+                                    (str/join "\n\r" canvas)
+                                    "\033[" (+ cursor-y 1) ";" (+ cursor-x 1) "H")))
 
 
 (defn draw-all
-  [{:keys [screen-size] :as connection}]
+  [{:keys [screen-size cursor-position] :as connection}]
   (let [[width height] @screen-size]
-    (send-frame connection (concat [(str "╭" (apply str (repeat (- width 2) "─")) "╮")]
-                                   (repeat (- height 2)
-                                           (str "│" (apply str (repeat (- width 2) " ")) "│"))
-                                   [(str "╰" (apply str (repeat (- width 2) "─")) "╯")]))))
+    (send-frame connection
+                (concat [(str "╭" (apply str (repeat (- width 2) "─")) "╮")]
+                        (repeat (- height 2)
+                                (str "│" (apply str (repeat (- width 2) " ")) "│"))
+                        [(str "╰" (apply str (repeat (- width 2) "─")) "╯")])
+                @cursor-position)))
