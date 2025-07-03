@@ -76,8 +76,8 @@
         {:keys [handle-packet handle-disconnect] :as connection} (get @connections client-channel)]
     (if-let [s (read-from-client client-channel)]
       (handle-packet connection s)
-    (do (handle-disconnect connection)
-        (.close client-channel)))))
+      (do (handle-disconnect connection)
+          (.close client-channel)))))
 
 
 (defn process-selector-keys
