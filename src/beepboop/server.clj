@@ -69,7 +69,7 @@
   (let [buffer (ByteBuffer/allocate 1024)
         bytes-read (.read client-channel buffer)]
     (when (pos? bytes-read)
-      (String. (.array buffer) 0 bytes-read))))
+      (byte-array (take bytes-read (.array buffer))))))
 
 
 (defn handle-client-read
