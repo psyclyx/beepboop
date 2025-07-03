@@ -13,6 +13,7 @@
 
 (defn bytes-to-chars-filter
   [sink]
+  ;; TODO buffer input on error to handle non-ascii
   (fn [{:keys [type byte] :as event}]
     (if (= type :input-byte)
       (sink {:type :input :char (char byte)})

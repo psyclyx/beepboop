@@ -121,7 +121,9 @@
   (loop []
     (if (not @shutdown)
       (do
-        (select-and-process context)
+        (try
+          (select-and-process context)
+          (catch Exception e (log/error e)))
         (recur))
       (shutdown-server context))))
 
