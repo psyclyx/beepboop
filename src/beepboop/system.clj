@@ -5,6 +5,7 @@
     [clojure.java.io :as io]
     [donut.system :as donut]
     [donut.system.validation :refer [validation-plugin]]
+    [beepboop.connection :as connection]
     [psyclyx.pastry :as pastry]))
 
 
@@ -12,7 +13,7 @@
   {::donut/plugins [pastry/pastry-plugin validation-plugin]
    ::donut/defs {:env {} ; to be replaced by config
                  :app {:server {::pastry/type ::server/tcp
-                                ::donut/config {:handler server/send-response
+                                ::donut/config {:handler connection/handle-packet
                                                 :bind {:port 9090}}}}}})
 
 
