@@ -113,10 +113,18 @@
     (filter-telnet byte #(handle-meta connection %) #(handle-input connection %))))
 
 
+(defn send-frame
+  [{:keys [channel] :as _connection} canvas]
+  (log/info "Sending frame")
+  ;; TODO: save previous canvas and only send diff
+  (server/send-message channel (str ansi-clear
+                                    ansi-reset-cursor
+                                    (str/join "\n\r" canvas))))
+
+
 (defn draw-all
-  [{:keys [channel screen-width screen-height] :as _connection}]
-  (log/info "Drawing")
-  (server/send-message channel (str ansi-clear ansi-reset-cursor
-                                    (apply str (repeat @screen-width "-")) "\n\r"
-                                    (apply str (repeat (- @screen-height 2) (str "|" (apply str (repeat (- @screen-width 2) " ")) "|\n\r")))
-                                    (apply str (repeat @screen-width "-")))))
+  [{:keys [screen-width screen-height] :as connection}]
+  (send-frame connection (concat [(str "." (apply str (repeat (- @screen-width 2) "-")) ".")]
+                                 (repeat (- @screen-height 2)
+                                         (str "|" (apply str (repeat (- @screen-width 2) " ")) "|"))
+                                 [(str "'" (apply str (repeat (- @screen-width 2) "-")) "'")])))
