@@ -8,5 +8,5 @@
 (defn handle-packet
   [client-channel data]
   (let [trimmed (str/trim data)]
-    (println trimmed)
+    (println "got packet:" trimmed)
     (server/send-response client-channel (str ">" trimmed "<"))))

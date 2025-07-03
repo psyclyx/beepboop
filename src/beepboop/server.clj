@@ -54,11 +54,12 @@
 
 
 (defn accept-client
-  [server-channel selector]
+  [{:keys [selector handler] :as _context} server-channel]
   (when-let [client-channel (.accept server-channel)]
     (doto client-channel
       (.configureBlocking false)
-      (.register selector SelectionKey/OP_READ))))
+      (.register selector SelectionKey/OP_READ))
+    (handler client-channel "")))
 
 
 (defn read-from-client
@@ -70,7 +71,7 @@
 
 
 (defn handle-client-read
-  [key handler]
+  [{:keys [handler] :as _context} key]
   (let [client-channel (.channel key)]
     (if-let [s (read-from-client client-channel)]
       (handler client-channel s)
@@ -78,19 +79,19 @@
 
 
 (defn process-selector-keys
-  [selector handler]
+  [{:keys [selector] :as context}]
   (doseq [key (.selectedKeys selector)]
     (cond
       (.isAcceptable key)
-      (accept-client (.channel key) selector)
+      (accept-client context (.channel key))
 
       (.isReadable key)
-      (handle-client-read key handler)))
+      (handle-client-read context key)))
   (.clear (.selectedKeys selector)))
 
 
 (defn shutdown-server
-  [server-channel selector]
+  [{:keys [server-channel selector] :as _context}]
   ;; Close all registered channels first
   (doseq [key (.keys selector)]
     (let [channel (.channel key)]
@@ -106,27 +107,31 @@
 
 
 (defn select-and-process
-  [selector handler]
+  [{:keys [selector] :as context}]
   (when (pos? (.select selector 1000))
-    (process-selector-keys selector handler)))
+    (process-selector-keys context)))
 
 
 (defn server-loop
-  [server-channel selector handler shutdown]
+  [{:keys [shutdown] :as context}]
   (loop []
     (if (not @shutdown)
       (do
-        (select-and-process selector handler)
+        (select-and-process context)
         (recur))
-      (shutdown-server server-channel selector))))
+      (shutdown-server context))))
 
 
 (defn start-server
   [{{:keys [bind handler]} ::donut/config}]
   (let [server-channel (create-server-channel bind)
-        selector (create-selector-with-server server-channel)
         shutdown (atom false)
-        server (future (server-loop server-channel selector handler shutdown))]
+        context {:server-channel server-channel
+                 :handler handler
+                 :connections (atom {})
+                 :selector (create-selector-with-server server-channel)
+                 :shutdown shutdown}
+        server (future (server-loop context))]
     {:shutdown shutdown
      :server server}))
 
