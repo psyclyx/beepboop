@@ -1,6 +1,7 @@
 (ns beepboop.connection
   (:require
     [beepboop.ansi :as ansi]
+    [beepboop.command :as command]
     [beepboop.draw :as draw]
     [beepboop.game :as game]
     [beepboop.server :as server]
@@ -13,7 +14,6 @@
 (declare handle-packet)
 (declare handle-disconnect)
 (declare handle-event)
-(declare handle-command)
 (declare render)
 
 
@@ -36,18 +36,23 @@
                         :canvas (draw/make-canvas)
                         :game game
                         :after-tick #(render @connection)
+                        :is-open (atom true)
                         :character (game/create-object game [(- (rand-int 50) 25) -5] [0 0] "@")
                         :edit-view (text-edit/text-edit-view
                                      "Command"
                                      [5 3] 50
-                                     #(handle-command @connection %))})
+                                     #(command/handle-command @connection game %))})
     (game/register-listener game @connection)
     @connection))
 
 
 (defn handle-disconnect
-  [{:keys [game] :as connection}]
+  [{:keys [channel game is-open] :as connection}]
+  (server/send-message channel (str ansi-clear
+                                    ansi-reset-cursor))
   (game/unregister-listener game connection)
+  (reset! is-open false)
+  (.close channel)
   (log/info "Connection closed"))
 
 
@@ -66,22 +71,15 @@
     (event-sink {:type :input-byte :byte byte})))
 
 
-(defn handle-command
-  [{:keys [game] :as connection} cmd]
-  (cond
-    (= cmd "tick") (do (dotimes [_ 10] (game/tick game 0.1))
-                       (render connection))
-    :else (log/info "Invalid command:" cmd)))
-
-
 (defn send-frame
-  [{:keys [channel canvas] :as _connection}]
-  (let [[cursor-x cursor-y] (draw/get-cursor-position canvas)]
-    ;; TODO: save previous canvas and only send diff
-    (server/send-message channel (str ansi-clear
-                                      ansi-reset-cursor
-                                      (str/join "\n\r" (draw/get-contents canvas))
-                                      "\033[" (+ cursor-y 1) ";" (+ cursor-x 1) "H"))))
+  [{:keys [channel canvas is-open] :as _connection}]
+  (when @is-open
+    (let [[cursor-x cursor-y] (draw/get-cursor-position canvas)]
+      ;; TODO: save previous canvas and only send diff
+      (server/send-message channel (str ansi-clear
+                                        ansi-reset-cursor
+                                        (str/join "\n\r" (draw/get-contents canvas))
+                                        "\033[" (+ cursor-y 1) ";" (+ cursor-x 1) "H")))))
 
 
 (defn render

@@ -79,8 +79,7 @@
         {:keys [handle-packet handle-disconnect] :as connection} (get @connections client-channel)]
     (if-let [s (read-from-client client-channel)]
       (handle-packet connection s)
-      (do (handle-disconnect connection)
-          (.close client-channel)))))
+      (handle-disconnect connection))))
 
 
 (defn process-selector-keys
@@ -96,7 +95,11 @@
 
 
 (defn shutdown-server
-  [{:keys [server-channel selector] :as _context}]
+  [{:keys [server-channel selector connections] :as _context}]
+  (doseq [[_channel {:keys [handle-disconnect] :as connection}] @connections]
+    (try
+      (handle-disconnect connection)
+      (catch Exception _ nil)))
   ;; Close all registered channels first
   (doseq [key (.keys selector)]
     (let [channel (.channel key)]
