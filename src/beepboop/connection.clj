@@ -7,6 +7,7 @@
     [beepboop.server :as server]
     [beepboop.telnet :as telnet]
     [beepboop.text-edit :as text-edit]
+    [beepboop.util :as util]
     [clojure.string :as str]
     [clojure.tools.logging :as log]))
 
@@ -37,7 +38,7 @@
                         :game game
                         :after-tick #(render @connection)
                         :is-open (atom true)
-                        :character (game/create-object game [(- (rand-int 50) 25) -5] [0 0] "@")
+                        :player (game/create-player game [(util/rand-range -30 30) -5])
                         :edit-view (text-edit/text-edit-view
                                      "Command"
                                      [5 3] 50

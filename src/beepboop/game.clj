@@ -1,13 +1,13 @@
 (ns beepboop.game
   (:require
     [beepboop.draw :as draw]
-    [beepboop.text-edit :as text-edit]
+    [beepboop.util :as util]
     [clojure.tools.logging :as log]))
 
 
 (def ms-between-ticks 50)
 (def drag 0.1)
-(def grav 2)
+(def grav 1)
 (def map-width 500)
 (def map-height 100)
 
@@ -18,17 +18,12 @@
                (repeat (quot map-height 2) (vec (repeat map-width {:type :ground}))))))
 
 
-(defn get-current-ms
-  []
-  (quot (System/nanoTime) 1000000))
-
-
 (defn make-game
   []
   {:objects (atom [])
    :grid (atom (make-grid))
    :offset (map quot [map-width map-height] [2 2])
-   :next-tick-target (atom (get-current-ms))
+   :next-tick-target (atom (util/current-ms))
    :listeners (atom (set []))})
 
 
@@ -40,6 +35,16 @@
                    :moving true})]
     (swap! objects #(conj % obj))
     obj))
+
+
+(defn create-player
+  [game pos]
+  (create-object game pos [0 0] "@"))
+
+
+(defn create-granade
+  [game thrower-pos vel]
+  (create-object game (map + thrower-pos (map * vel [0.5 0.5])) vel "*"))
 
 
 (defn register-listener
@@ -59,7 +64,7 @@
 
 (defn apply-grav
   [vel dt]
-  (map - vel [0 (* grav dt)]))
+  (map + vel [0 (* grav dt)]))
 
 
 (defn apply-drag
@@ -73,7 +78,7 @@
     (swap! obj (fn [{:keys [pos vel moving] :as obj}]
                  (if moving
                    (let [pos (map + pos vel)
-                         vel (map - (apply-grav (apply-drag vel dt) dt))
+                         vel (apply-grav (apply-drag vel dt) dt)
                          moving (not (get-tile @grid offset pos))]
                      (assoc obj :pos pos :vel vel :moving moving))
                    obj))))
@@ -83,12 +88,12 @@
 
 (defn maybe-tick
   [{:keys [next-tick-target] :as game}]
-  (let [current (get-current-ms)
+  (let [current (util/current-ms)
         time-til-tick (- @next-tick-target current)]
     (if (< time-til-tick 2)
       (do (reset! next-tick-target (+ @next-tick-target ms-between-ticks))
           (tick game (/ ms-between-ticks 1000))
-          (let [current (get-current-ms)]
+          (let [current (util/current-ms)]
             (when (< @next-tick-target current)
               (log/info "Fell behind our clock, drifting to resync"))
             (reset! next-tick-target (+ current ms-between-ticks))
