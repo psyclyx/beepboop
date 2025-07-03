@@ -33,8 +33,9 @@
                                          [(str (subs value 0 (- cursor 1)) (subs value cursor))
                                           (- cursor 1)]
                                          [value cursor])))
-             :enter (do (on-enter (get @state 0))
-                        (reset! state ["" 0]))
+             :enter (swap! state (fn [[value _cursor]]
+                                   (cond (seq value) (on-enter value))
+                                   ["" 0]))
              ())
     ()))
 
@@ -44,9 +45,9 @@
   (let [[x y] @position
         [value cursor] @state
         inner-width (- @width 4)]
-    (draw/box canvas [x y] [@width 3])
-    (draw/shape canvas [(+ x 2) y] [(str " " @label " ")])
-    (draw/shape canvas [(+ x 2) (+ y 1)] [(if (<= (count value) inner-width)
-                                            value
-                                            (subs value 0 inner-width))])
+    (draw/box canvas [x y] [@width 3] " ")
+    (draw/text canvas [(+ x 2) y] (str " " @label " "))
+    (draw/text canvas [(+ x 2) (+ y 1)] (if (<= (count value) inner-width)
+                                          value
+                                          (subs value 0 inner-width)))
     (draw/set-cursor-position canvas [(+ x 2 cursor) (+ y 1)])))

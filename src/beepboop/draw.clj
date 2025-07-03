@@ -1,4 +1,9 @@
-(ns beepboop.draw)
+(ns beepboop.draw
+  (:require
+    [clojure.string :as str]))
+
+
+(def transparent \tab)
 
 
 (defn make-canvas
@@ -41,40 +46,57 @@
   @size)
 
 
-(defn shape
-  [{:keys [contents] :as _canvas} [x y] new-lines]
+(defn pixels
+  [{:keys [contents size] :as _canvas} pos dim func]
+  (let [[x y] (map int pos)
+        [width height] (map int dim)]
+    (if (and (< x (get @size 0))
+             (< y (get @size 1))
+             (> (+ x width) 0)
+             (> (+ y height) 0))
+      (swap! contents
+             (fn [current-lines]
+               (vec (map-indexed
+                      (fn [i current-line]
+                        (if (and (>= i y) (< i (+ y height)))
+                          (apply str (map-indexed
+                                       (fn [j current-char]
+                                         (if (and (>= j x) (< j (+ x width)))
+                                           (if-let [new-char (func [(- j x) (- i y)])]
+                                             new-char
+                                             current-char)
+                                           current-char))
+                                       current-line))
+                          current-line))
+                      current-lines))))
+      ())))
+
+
+(defn array
+  [canvas pos new-lines]
   (let [new-lines-vec (vec new-lines)]
-    (swap! contents
-           (fn [current-lines]
-             (vec (map-indexed
-                    (fn [i current-line]
-                      (if-let [new-line (get new-lines-vec (- i y))]
-                        (apply str (map-indexed
-                                     (fn [j current-char]
-                                       (let [new-char (get new-line (- j x))]
-                                         (if (or (= new-char "\t") (= new-char nil))
-                                           current-char
-                                           new-char)))
-                                     current-line))
-                        current-line))
-                    current-lines))))))
+    (cond (seq new-lines-vec)
+          (pixels canvas pos [(count (get new-lines-vec 0)) (count new-lines-vec)] (fn [[x y]]
+                                                                                     (let [c (get (get new-lines-vec y) x)]
+                                                                                       (if (= c transparent) nil c)))))))
+
+
+(defn text
+  [canvas pos text]
+  (array canvas pos (str/split-lines text)))
 
 
 (defn rect
-  [canvas fill pos [width height]]
-  (shape
-    canvas
-    pos
-    (repeat height
-            (apply str (repeat width fill)))))
+  [canvas pos size fill]
+  (pixels canvas pos size (fn [_pos] fill)))
 
 
 (defn box
-  [canvas pos [width height]]
-  (shape
+  [canvas pos [width height] fill]
+  (array
     canvas
     pos
     (concat [(str "╭" (apply str (repeat (- width 2) "─")) "╮")]
             (repeat (- height 2)
-                    (str "│" (apply str (repeat (- width 2) " ")) "│"))
+                    (str "│" (apply str (repeat (- width 2) fill)) "│"))
             [(str "╰" (apply str (repeat (- width 2) "─")) "╯")])))

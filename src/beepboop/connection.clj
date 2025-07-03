@@ -2,6 +2,7 @@
   (:require
     [beepboop.ansi :as ansi]
     [beepboop.draw :as draw]
+    [beepboop.game :as game]
     [beepboop.server :as server]
     [beepboop.telnet :as telnet]
     [beepboop.text-edit :as text-edit]
@@ -12,6 +13,7 @@
 (declare handle-packet)
 (declare handle-disconnect)
 (declare handle-event)
+(declare handle-command)
 (declare render)
 
 
@@ -20,7 +22,7 @@
 
 
 (defn handle-connect
-  [channel]
+  [channel game]
   (log/info "New connection")
   (telnet/initialize channel)
   (let [connection (atom nil)]
@@ -32,11 +34,12 @@
                                         (ansi/escape-codes-filter
                                           #(handle-event @connection %))))
                         :canvas (draw/make-canvas)
+                        :game game
+                        :character (game/create-object game [(- (rand-int 50) 25) -5] [0 0] "@")
                         :edit-view (text-edit/text-edit-view
-                                     "Edit box"
-                                     [6 4]
-                                     30
-                                     #(log/info "Text entered" %))})
+                                     "Command"
+                                     [5 3] 50
+                                     #(handle-command @connection %))})
     @connection))
 
 
@@ -60,6 +63,14 @@
     (event-sink {:type :input-byte :byte byte})))
 
 
+(defn handle-command
+  [{:keys [game] :as connection} cmd]
+  (cond
+    (= cmd "tick") (do (dotimes [_ 10] (game/tick game 0.1))
+                       (render connection))
+    :else (log/info "Invalid command:" cmd)))
+
+
 (defn send-frame
   [{:keys [channel canvas] :as _connection}]
   (let [[cursor-x cursor-y] (draw/get-cursor-position canvas)]
@@ -71,8 +82,9 @@
 
 
 (defn render
-  [{:keys [canvas edit-view] :as connection}]
+  [{:keys [canvas edit-view game] :as connection}]
   (let [[width height] (draw/get-size canvas)]
-    (draw/box canvas [0 0] [width height])
+    (game/render game canvas [0 0])
     ((get edit-view :render) edit-view canvas)
+    (draw/box canvas [0 0] [width height] draw/transparent)
     (send-frame connection)))

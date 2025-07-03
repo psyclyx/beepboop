@@ -56,12 +56,12 @@
 
 
 (defn accept-client
-  [{:keys [selector connection-handler connections] :as _context} server-channel]
+  [{:keys [selector connection-handler connections game] :as _context} server-channel]
   (when-let [client-channel (.accept server-channel)]
     (doto client-channel
       (.configureBlocking false)
       (.register selector SelectionKey/OP_READ))
-    (swap! connections assoc client-channel (connection-handler client-channel))))
+    (swap! connections assoc client-channel (connection-handler client-channel game))))
 
 
 (defn read-from-client
@@ -129,13 +129,14 @@
 
 
 (defn start-server
-  [{{:keys [bind connection-handler]} ::donut/config}]
+  [{{:keys [bind connection-handler game]} ::donut/config}]
   (let [server-channel (create-server-channel bind)
         shutdown (atom false)
         context {:server-channel server-channel
                  :connection-handler connection-handler
                  :connections (atom {})
                  :selector (create-selector-with-server server-channel)
+                 :game game
                  :shutdown shutdown}
         server (future (server-loop context))]
     {:shutdown shutdown

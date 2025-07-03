@@ -2,6 +2,7 @@
   (:require
     [aero.core :as aero]
     [beepboop.connection :as connection]
+    [beepboop.game :as game]
     [beepboop.server :as server]
     [clojure.java.io :as io]
     [clojure.tools.logging :as log]
@@ -29,7 +30,8 @@
    ::donut/defs {:env {} ; to be replaced by config
                  :app {:server {::pastry/type ::server/tcp
                                 ::donut/config {:connection-handler connection/handle-connect
-                                                :bind {:port 9090}}}}}})
+                                                :bind {:port 9090}
+                                                :game (game/make-game)}}}}})
 
 
 (defn -read-config
