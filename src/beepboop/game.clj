@@ -10,7 +10,7 @@
 (def grav 1)
 (def map-width 500)
 (def map-height 100)
-(def granade-explosion-size 2.5)
+(def grenade-explosion-size 2.5)
 
 
 (defn make-grid
@@ -45,10 +45,10 @@
   (create-object game :player pos [0 0]))
 
 
-(defn create-granade
+(defn create-grenade
   [game thrower-pos vel]
   (create-object game
-                 :granade
+                 :grenade
                  (map + thrower-pos (map * vel [0.5 0.5]))
                  vel))
 
@@ -87,8 +87,8 @@
                                (let [pos (map + pos vel)
                                      vel (apply-grav (apply-drag vel dt) dt)
                                      moving (not (get-tile @grid offset pos))
-                                     type (if (and (= type :granade) (not moving))
-                                            (do (swap! explosions #(conj % [pos granade-explosion-size]))
+                                     type (if (and (= type :grenade) (not moving))
+                                            (do (swap! explosions #(conj % [pos grenade-explosion-size]))
                                                 :explosion)
                                             type)]
                                  (assoc obj :type type :pos pos :vel vel :moving moving))
@@ -134,10 +134,10 @@
       (let [{:keys [type pos]} @obj]
         (case type
           :player (draw/text canvas (pos-to-canvas pos) "T")
-          :granade (draw/text canvas (pos-to-canvas pos) "*")
+          :grenade (draw/text canvas (pos-to-canvas pos) "*")
           :explosion (draw/pixels
                        canvas
                        (map - (pos-to-canvas pos) [5 5])
                        [10 10]
                        (fn [pos]
-                         (if (< (util/dist-between pos [5 5]) granade-explosion-size) "#" nil))))))))
+                         (if (< (util/dist-between pos [5 5]) grenade-explosion-size) "@" nil))))))))

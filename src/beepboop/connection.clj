@@ -88,7 +88,15 @@
 (defn render
   [{:keys [canvas edit-view player message game] :as connection}]
   (let [[width height] (draw/get-size canvas)]
-    (game/render game canvas [0 0])
+    (game/render game canvas [0 -10])
+    (draw/text canvas [(- width 35) 3] (str
+                                         "Commands:\n"
+                                         "fire - launch a grenade\n"
+                                         "exit - quit the game\n"
+                                         "\n"
+                                         "you cannot aim grenades\n"
+                                         "\n"
+                                         "Good luck!"))
     ((get edit-view :render) edit-view canvas)
     (draw/box canvas [0 0] [width height] draw/transparent)
     (when (and (not (get @player :alive)) (not @message))
