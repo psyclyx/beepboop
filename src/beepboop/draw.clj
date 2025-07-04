@@ -76,9 +76,12 @@
   [canvas pos new-lines]
   (let [new-lines-vec (vec new-lines)]
     (cond (seq new-lines-vec)
-          (pixels canvas pos [(count (get new-lines-vec 0)) (count new-lines-vec)] (fn [[x y]]
-                                                                                     (let [c (get (get new-lines-vec y) x)]
-                                                                                       (if (= c transparent) nil c)))))))
+          (pixels canvas
+                  pos
+                  [(reduce max (map count new-lines-vec)) (count new-lines-vec)]
+                  (fn [[x y]]
+                    (let [c (get (get new-lines-vec y) x)]
+                      (if (= c transparent) nil c)))))))
 
 
 (defn text
@@ -100,3 +103,16 @@
             (repeat (- height 2)
                     (str "│" (apply str (repeat (- width 2) fill)) "│"))
             [(str "╰" (apply str (repeat (- width 2) "─")) "╯")])))
+
+
+(defn centered-message-box
+  [canvas text]
+  (let [lines (str/split-lines text)
+        text-width (reduce max (map count lines))
+        text-height (count lines)
+        box-size [(+ text-width 8) (+ text-height 4)]
+        top-left (map -
+                      (map quot @(get canvas :size) [2 2])
+                      (map quot box-size [2 2]))]
+    (box canvas top-left box-size " ")
+    (array canvas (map + top-left [4 2]) lines)))

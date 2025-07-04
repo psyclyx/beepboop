@@ -10,6 +10,7 @@
 (def grav 1)
 (def map-width 500)
 (def map-height 100)
+(def granade-explosion-size 2.5)
 
 
 (defn make-grid
@@ -28,23 +29,28 @@
 
 
 (defn create-object
-  [{:keys [objects] :as _game} pos vel icon]
-  (let [obj (atom {:icon icon
+  [{:keys [objects] :as _game} type pos vel]
+  (let [obj (atom {:type type
                    :pos pos
                    :vel vel
-                   :moving true})]
+                   :moving true
+                   :alive true
+                   :cleanup-time nil})]
     (swap! objects #(conj % obj))
     obj))
 
 
 (defn create-player
   [game pos]
-  (create-object game pos [0 0] "@"))
+  (create-object game :player pos [0 0]))
 
 
 (defn create-granade
   [game thrower-pos vel]
-  (create-object game (map + thrower-pos (map * vel [0.5 0.5])) vel "*"))
+  (create-object game
+                 :granade
+                 (map + thrower-pos (map * vel [0.5 0.5]))
+                 vel))
 
 
 (defn register-listener
@@ -74,14 +80,24 @@
 
 (defn tick
   [{:keys [grid offset objects listeners] :as _game} dt]
-  (doseq [obj @objects]
-    (swap! obj (fn [{:keys [pos vel moving] :as obj}]
-                 (if moving
-                   (let [pos (map + pos vel)
-                         vel (apply-grav (apply-drag vel dt) dt)
-                         moving (not (get-tile @grid offset pos))]
-                     (assoc obj :pos pos :vel vel :moving moving))
-                   obj))))
+  (let [explosions (atom [])]
+    (doseq [obj @objects]
+      (swap! obj (fn [{:keys [type pos vel moving] :as obj}]
+                   (let [obj (if moving
+                               (let [pos (map + pos vel)
+                                     vel (apply-grav (apply-drag vel dt) dt)
+                                     moving (not (get-tile @grid offset pos))
+                                     type (if (and (= type :granade) (not moving))
+                                            (do (swap! explosions #(conj % [pos granade-explosion-size]))
+                                                :explosion)
+                                            type)]
+                                 (assoc obj :type type :pos pos :vel vel :moving moving))
+                               obj)]
+                     obj))))
+    (doseq [[pos size] @explosions]
+      (doseq [obj @objects]
+        (when (<= (util/dist-between pos (get @obj :pos)) size)
+          (swap! obj #(assoc % :alive false))))))
   (doseq [{:keys [after-tick]} @listeners]
     (after-tick)))
 
@@ -104,7 +120,8 @@
 (defn render
   [{:keys [grid offset objects] :as _game} canvas center]
   (let [canvas-size (draw/get-size canvas)
-        top-left (map - center (map quot canvas-size [2 2]))]
+        top-left (map - center (map quot canvas-size [2 2]))
+        pos-to-canvas (fn [pos] (map - pos top-left))]
     (draw/pixels canvas
                  [0 0]
                  (draw/get-size canvas)
@@ -114,5 +131,13 @@
                        :ground "█"
                        nil " "))))
     (doseq [obj @objects]
-      (let [{:keys [pos icon]} @obj]
-        (draw/text canvas (map - pos top-left) icon)))))
+      (let [{:keys [type pos]} @obj]
+        (case type
+          :player (draw/text canvas (pos-to-canvas pos) "T")
+          :granade (draw/text canvas (pos-to-canvas pos) "*")
+          :explosion (draw/pixels
+                       canvas
+                       (map - (pos-to-canvas pos) [5 5])
+                       [10 10]
+                       (fn [pos]
+                         (if (< (util/dist-between pos [5 5]) granade-explosion-size) "#" nil))))))))

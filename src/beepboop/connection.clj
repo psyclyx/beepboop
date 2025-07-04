@@ -26,7 +26,8 @@
   [channel game]
   (log/info "New connection")
   (telnet/initialize channel)
-  (let [connection (atom nil)]
+  (let [connection (atom nil)
+        player (game/create-player game [(util/rand-range -30 30) -5])]
     (reset! connection {:channel channel
                         :handle-packet handle-packet
                         :handle-disconnect handle-disconnect
@@ -38,11 +39,12 @@
                         :game game
                         :after-tick #(render @connection)
                         :is-open (atom true)
-                        :player (game/create-player game [(util/rand-range -30 30) -5])
+                        :player player
+                        :message (atom nil)
                         :edit-view (text-edit/text-edit-view
                                      "Command"
                                      [5 3] 50
-                                     #(command/handle-command @connection game %))})
+                                     #(command/handle-command @connection player game %))})
     (game/register-listener game @connection)
     @connection))
 
@@ -84,9 +86,13 @@
 
 
 (defn render
-  [{:keys [canvas edit-view game] :as connection}]
+  [{:keys [canvas edit-view player message game] :as connection}]
   (let [[width height] (draw/get-size canvas)]
     (game/render game canvas [0 0])
     ((get edit-view :render) edit-view canvas)
     (draw/box canvas [0 0] [width height] draw/transparent)
+    (when (and (not (get @player :alive)) (not @message))
+      (reset! message "You died :("))
+    (when @message
+      (draw/centered-message-box canvas @message))
     (send-frame connection)))
