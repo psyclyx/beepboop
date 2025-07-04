@@ -32,7 +32,6 @@
 
 (defn set-size
   [{:keys [size contents cursor-position] :as canvas} [width height]]
-  (println "setting size to" [width height])
   (if (not= size [width height])
     (do (reset! size [width height])
         (reset! contents (vec (repeat height

@@ -1,7 +1,6 @@
 (ns beepboop.telnet
   (:require
-    [beepboop.server :as server]
-    [clojure.tools.logging :as log]))
+    [beepboop.server :as server]))
 
 
 (def telnet-iac               (unchecked-byte 0xFF))
@@ -29,8 +28,7 @@
     :sb-naws {:type :screen-size
               :size [(get-16-bit-int-from-bytes bytes 0)
                      (get-16-bit-int-from-bytes bytes 2)]}
-    (do (log/info "Telnet SB" type)
-        nil)))
+    nil))
 
 
 ;; See https://github.com/seanmiddleditch/libtelnet/blob/5f5ecee776b9bdaa4e981e5f807079a9c79d633e/libtelnet.c#L973
@@ -53,10 +51,8 @@
                  (= byte telnet-dont) (reset! state :dont)
                  (= byte telnet-will) (reset! state :will)
                  (= byte telnet-wont) (reset! state :wont)
-                 :else (do (log/info "Telnet command " byte)
-                           (reset! state :data)))
-          (:do :dont :will :wont) (do (log/info "Telnet command" @state byte)
-                                      (reset! state :data))
+                 :else (reset! state :data))
+          (:do :dont :will :wont) (reset! state :data)
           :sb (do (cond
                     (= byte telnet-naws) (reset! sb-type :sb-naws)
                     :else (reset! sb-type byte))
